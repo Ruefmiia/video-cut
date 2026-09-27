@@ -1,174 +1,37 @@
-> **Video Cut — work in progress**
->
-> This repository is a Windows-focused, beginner-friendly fork of [LosslessCut](https://github.com/mifi/lossless-cut), licensed under GPL-2.0-only. It is not an official LosslessCut release. The interface defaults to Simplified Chinese and focuses on naming and exporting many clips from one long video. GIF export, per-clip text overlays, and subtitle burning are implemented in the current development branch. See the [Simplified Chinese guide](README.zh-CN.md) and [development plan](DEVELOPMENT_PLAN.md).
+# Video Cut 操作说明
 
-<div align="center">
-	<br>
-  <p><a href="https://losslesscut.app/"><img src="src/renderer/src/icon.svg" width="120" alt="LosslessCut" /></a></p>
-  <p><a href="https://losslesscut.app/"><b>LosslessCut</b></a></p>
-  The swiss army knife of lossless video/audio editing
-	<br>
-  <img src="https://github.com/mifi/lossless-cut/workflows/Build/release/badge.svg" />
-  <a href="https://paypal.me/mifino/usd"><img src="https://img.shields.io/badge/Donate-PayPal-green.svg" /></a> <a href="https://github.com/mifi/lossless-cut#download"><img src="https://img.shields.io/github/v/release/mifi/lossless-cut" /></a> <a href="https://discord.gg/fhnEREfUJ3"><img src="https://img.shields.io/discord/986051448385183804" /></a> <a href="https://twitter.com/losslesscut"><img src="https://img.shields.io/twitter/follow/losslesscut?label=Twitter&style=social" alt="Twitter"></a>
-	<br>
-	<br>
-  <a href="https://mifi.no/thanks/">Thanks to my supporters</a> and everyone who purchased LosslessCut!
-	<br>
-	<br>
-  <p align="center"><img src="main_screenshot.jpg" width="600" alt="screenshot" /></p>
-	<br>
-	<br>
-</div>
+Video Cut 用于从长视频中挑选多个短片段，分别命名、导出和整理，也可以制作 GIF、截图、添加文字或烧录字幕。
 
-LosslessCut aims to be the ultimate cross platform FFmpeg GUI for extremely fast and lossless operations on video, audio, subtitle and other related media files.
-The main feature is lossless trimming and cutting of video and audio files, which is great for saving space by rough-cutting your large video files taken from a video camera, GoPro, drone, etc. It lets you quickly extract the good parts from your videos and discard many gigabytes of data without doing a slow re-encode and thereby losing quality. There are also many more [use cases](#typical-workflow). Everything is extremely fast because it does an almost direct data copy, fueled by the awesome FFmpeg which does all the grunt work.
+## 截取并导出片段
 
-## Table of contents
+1. 打开 Video Cut，将视频拖入窗口，或通过菜单打开视频。
+2. 播放或拖动时间轴，找到片段起点，点击“设置开始时间”；找到终点后点击“设置结束时间”。也可以输入开始和结束时间进行精确定位。
+3. 点击“添加片段”。在片段列表中选择新片段并填写名称，便于之后查找和拼接。
+4. 重复以上步骤，继续从同一视频添加其他片段。
+5. 选择输出目录和格式，点击“导出”。每个片段会分别保存为文件；文件名可包含片段序号、名称和起始时间。
 
-- [Features](#features)
-- [Example lossless use cases](#example-lossless-use-cases)
-- [Download](#download)
-- [Supported formats](#supported-formats)
-- [Documentation, usage & getting started](#documentation)
-- [Video demos](#video-demos)
-- [Featured](#featured)
-- [Attributions](#attributions)
+默认导出会快速复制视频流。添加文字或烧录字幕时需要重新编码，软件会在可读取时沿用原视频码率，处理时间会更长。
 
-## Features
+## 制作 GIF
 
-- Lossless cutting of most video and audio formats
-- [Smart cut](https://github.com/mifi/lossless-cut/issues/126) (experimental)
-- Losslessly cut out parts of video/audio (for cutting away commercials etc.)
-- Losslessly rearrange the order of video/audio segments
-- Lossless merge/concatenation of arbitrary files (with identical codecs parameters, e.g. from the same camera)
-- Lossless multi track/stream editing
-  - Combine arbitrary tracks from multiple files (ex. add music or subtitle track to a video file)
-  - Remove unneeded tracks
-  - Replace or re-encode only some tracks
-  - Extract all tracks from a file (extract video, audio, subtitle, attachments and other tracks from one file into separate files)
-- View technical data about all tracks. Edit file metadata, per-track metadata and per-track disposition
-- Select video/audio tracks for playback. Playback multiple audio tracks simultaneously.
-- Fast multi-file workflow (note: no mass/batch export yet)
-- Keyboard shortcut workflow
-- Losslessly remux video/audio into a different container (file) format
-- Take full-resolution snapshots from videos in JPEG/PNG format (low or high quality)
-- Export ranges of video frames to images (every nth frame, second, by scene change, best thumbnails)
-  - Export only from a selected time range (segment)
-  - Optionally include original timestamps in image file names
-- Manual input of cutpoint times
-- Apply a per-file timecode offset (and auto load timecode from file)
-- Change rotation/orientation metadata in videos
-- Timeline zoom and frame/keyframe jumping for cutting around keyframes
-- Video thumbnails and audio waveform
-- Saves per project cut segments to project file
-- View FFmpeg last command log so you can modify and re-run recent commands on the command line
-- Undo/redo
-- Advanced segment query and mutation JS-based expression language.
-- Give labels to cut segments, annotate with tags
-- [Import/export](docs/index.md#importexport-projects) segments: MP4/MKV chapter marks, Text file, YouTube, CSV, CUE, XML (DaVinci, Final Cut Pro) and more
-- MKV/MP4 embedded chapters marks editor
-- View subtitles
-- Customizable keyboard hotkeys
-- Black scene detection, silent audio detection, and scene change detection
-- Divide timeline into segments of length L, size (X MB), N number of segments or even randomized segments!
-- Speed up / slow down video or audio file ([changing FPS](https://github.com/mifi/lossless-cut/issues/1712))
-- Lossless crop and aspect ratio modification
-- Basic [CLI](docs/cli.md) and [HTTP API](docs/api.md)
-- Show (DJI) embedded GPS track on a map
-- Losslessly Download videos over HTTP (e.g. HLS `.m3u8`)
-- Extremely fast removal of all non-keyframes (e.g. timelapse)
+在片段列表中选中要制作动图的片段，打开导出格式并选择“GIF 动图（自动优化）”，然后导出。GIF 体积会随时长、画面运动和颜色变化；界面显示的是估算值。
 
-## Example lossless use cases
+## 添加文字
 
-- Cut out commercials from a recorded TV show (and re-format from TS to MP4).
-- Remove audio tracks from a file.
-- Extract music track from a video and cut it to your needs.
-- Add music to a video (or replace existing audio track).
-- Combine audio and video tracks from separate recordings.
-- Include an external subtitle into a video
-- Quickly change a H264/H265 MKV video to MOV or MP4 for playback on iPhone.
-- Import a list of cut times from other tool as a EDL (edit decision list, CSV) and run these cuts with LosslessCut.
-- Export a list of cut times as a CSV EDL and process these in another tool.
-- Quickly cut a file by its MP4/MKV chapters.
-- Quickly cut a [YouTube video](https://youtube-dl.org/) by its chapters (or music times from a comment).
-- Change the language of a file's audio/subtitle tracks.
-- Attach cover art / thumbnail to videos / audio from an external JPEG file or from a frame on the timeline.
-- Change author, title, GPS position, recording time of a video.
-- Fix rotation of a video that has the wrong orientation flag set.
-- Loop a video / audio clip X times quickly without re-encoding, see [#284](https://github.com/mifi/lossless-cut/issues/284).
-- Convert a video or parts of it into X image files (not lossless)
-- Losslessly split a video into one file per scene (note you probably have to shift segments, see [#330](https://github.com/mifi/lossless-cut/issues/330).)
-- Cut away silent parts from an audio/video file.
-- Split video into segments to for example respect Twitter's 140 second limit.
-- Annotate each segment with one or more tags, then use those tags to organize your segments or use it to create an output folder structure or hierarchy for your segments.
+在片段列表中选中片段，点击“添加文字”，输入内容并设置显示时长。文字从该片段开始时出现；将显示时长设为片段全长即可全程显示。文字会烧录到导出画面中。
 
-See also [Recipe cookbook](docs/recipes.md)
+## 添加字幕
 
-## Download
+选中片段后点击“添加字幕”，选择对应的 SRT 字幕文件。导出时在导出选项中启用字幕烧录。字幕烧录需要重新编码。
 
-If you want to support my continued work on LosslessCut, and you want the advantage of a secure and simple installation process with automatic, stable updates, consider getting it from your favorite store:
+## 截图
 
-<a href="https://apps.apple.com/app/id1505323402"><img src="mac-app-store-badge.svg" alt="Mac App Store" height="50"/></a> <a href="https://www.microsoft.com/store/apps/9P30LSR4705L?cid=storebadge&ocid=badge"><img src="ms-store-badge.svg" alt="MS badge" height="50"/></a>
+播放到需要的画面，使用截图按钮保存当前帧图片。截图按视频原始分辨率导出。
 
-For Linux I publish to the Snap Store:
+## 保存项目
 
-<a href="https://snapcraft.io/losslesscut"><img src="https://github.com/mifi/lossless-cut/raw/master/snap-store-black.svg?sanitize=true" alt="Snapcraft" height="50"/></a>
+从项目菜单保存片段项目。之后可以重新打开项目，继续调整片段、名称和文字字幕设置，再进行导出。
 
-If you prefer to download the executables manually, this will of course always be free (see also [supported operating systems](docs/requirements.md)):
+## 快捷键
 
-- macOS: [Intel](https://github.com/mifi/lossless-cut/releases/latest/download/LosslessCut-mac-x64.dmg) / [Apple Silicon](https://github.com/mifi/lossless-cut/releases/latest/download/LosslessCut-mac-arm64.dmg) DMG (note that PKG does **not** work)
-- Windows: [7zip](https://github.com/mifi/lossless-cut/releases/latest/download/LosslessCut-win-x64.7z) (Windows 7, 8 and 8.1 is [no longer supported after v3.50.0](docs/requirements.md))
-- Linux: [x64 tar.bz2](https://github.com/mifi/lossless-cut/releases/latest/download/LosslessCut-linux-x64.tar.bz2) / [x64 AppImage](https://github.com/mifi/lossless-cut/releases/latest/download/LosslessCut-linux-x86_64.AppImage) / [arm64 tar.bz2](https://github.com/mifi/lossless-cut/releases/latest/download/LosslessCut-linux-arm64.tar.bz2) / [Raspberry Pi armv7l](https://github.com/mifi/lossless-cut/releases/latest/download/LosslessCut-linux-armv7l.tar.bz2)
-- [More releases](https://github.com/mifi/lossless-cut/releases) - Note that APPX (Windows) and PKG (macOS) do **not** work)
-- [Latest nightly builds 🧪](https://mifi.no/llc/nightly/)
-
-Note that the above are the [only official downloads](docs/index.md#faq). There are also unofficial releases like [Flathub](https://flathub.org/apps/details/no.mifi.losslesscut) (not maintained by me). Difference between App Stores and GitHub download? [Please see FAQ](docs/index.md#faq).
-
-[![](./donate.svg)](https://mifi.no/thanks)
-
-LosslessCut is maintained by me alone and will always remain free and open source. If it's useful to you, consider supporting my work. Alternatively [donate to the FFmpeg team](https://www.ffmpeg.org/donations.html) because they are doing the world a huge favor.
-
-[Paypal](https://paypal.me/mifino/usd) | [crypto](https://mifi.no/thanks) | [more](https://mifi.no/thanks)
-
-## Supported formats
-
-LosslessCut uses the Chromium browser's HTML5 video player, and not all formats/codecs are [natively supported](https://www.chromium.org/audio-video). Generally, the following file formats work: `MP4`, `MOV`, `WebM`, `Matroska`, `OGG` and `WAV`. Audio codecs: `FLAC`, `MP3`, `Opus`, `PCM`, `Vorbis` and `AAC`. Video codecs: `H264`, `AV1`, `Theora`, `VP8`, `VP9` and `H265` (with hardware decoder). Learn the [difference between a codec and a format](docs/index.md#primer-videoaudio-codecs-vs-formats). Codecs and formats not listed above can still be converted to a supported format/codec from the `File` menu (try the option *Fastest: FFmpeg-assisted playback* first). A low quality version of the file will then be created and opened in the player. Note that the actual cut/export operation will still be performed on the original file, so it will be lossless. This allows for potentially opening any file that FFmpeg is able to decode.
-
-## Documentation
-
-- Official website: [LosslessCut.app](https://losslesscut.app)
-- **[Getting started, FAQ and usage documentation](docs/index.md)**
-- [Troubleshooting and known issues and limitations](docs/troubleshooting.md)
-- [Contributing](CONTRIBUTING.md)
-
-### Video demos
-
-- [Common features](https://www.youtube.com/watch?v=pYHMxXy05Jg)
-- [How to add a thumbnail / cover art to an MP4](https://www.youtube.com/watch?v=4pYJ93cn80E)
-- [How to add multi-language audio to a video](https://www.youtube.com/watch?v=MRBGDsuw_WU)
-- Your video here?
-
-## Featured
-
-- [Console newsletter](https://console.substack.com/p/console-93)
-- Hacker News [2024](https://news.ycombinator.com/item?id=40829494) [2022](https://news.ycombinator.com/item?id=33969490) [2020-10](https://news.ycombinator.com/item?id=24883030) [2020-01](https://news.ycombinator.com/item?id=22026412) [2016](https://news.ycombinator.com/item?id=12885585)
-- [Wikipedia](https://en.m.wikipedia.org/wiki/LosslessCut)
-- Your link here?
-- theo (YouTube) [1](https://youtu.be/FI5ba4RRE8U?t=246) [2](https://youtu.be/uaCypXEJjes?t=381)
-
-<img src="https://api.star-history.com/svg?repos=mifi/lossless-cut&type=Date" alt="Star History Chart" width="400px" />
-
-## Attributions
-- App icon made by [Dimi Kazak](http://www.flaticon.com/authors/dimi-kazak "Dimi Kazak") from [www.flaticon.com](http://www.flaticon.com "Flaticon") is licensed by [CC 3.0 BY](http://creativecommons.org/licenses/by/3.0/ "Creative Commons BY 3.0").
-- [Lottie animation by Chris Gannon](https://lottiefiles.com/7077-magic-flow).
-- Thanks to Adi Abinun and [@abdul-alhasany](https://github.com/mifi/lossless-cut/issues/2561) for UI work.
-- Thanks to translators who helped translate the app. [You can too!](docs/translation.md)
-- [Thanks to everyone for supporting](https://mifi.no/thanks/) my open source work 🙌
-
----
-
-Made with ❤️ in [🇳🇴](https://www.youtube.com/watch?v=uQIv8Vo9_Jc)
-
-[More apps by mifi.no](https://mifi.no/)
-
-Follow me on [GitHub](https://github.com/mifi/), [YouTube](https://www.youtube.com/channel/UC6XlvVH63g0H54HSJubURQA), [IG](https://www.instagram.com/mifi.no/), [Twitter](https://twitter.com/mifi_no) for more awesome content!
+点击界面顶部的“键盘快捷键”按钮可显示常用快捷键，再次点击即可收起。快捷键包括设置片段起止点、播放或暂停，以及跳转到指定时间。
