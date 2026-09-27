@@ -2597,6 +2597,7 @@ function App() {
                   setStreamsSelectorShown={setStreamsSelectorShown}
                   selectedSegments={segmentsOrInverse.selected}
                   toggleDarkMode={toggleDarkMode}
+                  keyBindingByAction={keyBindingByAction}
                 />
 
                 <div style={{ flexGrow: 1, display: 'flex', overflowY: 'hidden' }}>

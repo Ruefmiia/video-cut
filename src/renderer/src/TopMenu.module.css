@@ -1,3 +1,7 @@
+.wrapper {
+  position: relative;
+}
+
 .wrapper button, .wrapper select {
   background-color: var(--gray-1);
 }
@@ -8,4 +12,56 @@
 
 .wrapper select {
   padding: .3em 1.4em .3em .3em;
+}
+
+.shortcutsPopover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + .35em);
+  right: .3em;
+  width: min(24em, calc(100vw - 1em));
+  padding: .9em 1em;
+  color: var(--gray-12);
+  background: var(--gray-2);
+  border: 1px solid var(--gray-6);
+  border-radius: .45em;
+  box-shadow: 0 .5em 1.5em rgb(0 0 0 / 35%);
+}
+
+.shortcutsTitle {
+  margin: 0 0 .65em;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.shortcutsList {
+  display: grid;
+  gap: .45em;
+  margin: 0;
+}
+
+.shortcutRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  font-size: .9em;
+}
+
+.shortcutRow dt {
+  color: var(--gray-11);
+}
+
+.shortcutRow dd {
+  display: flex;
+  align-items: center;
+  gap: .25em;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.shortcutKey + .shortcutKey::before {
+  content: '+';
+  margin-right: .25em;
+  color: var(--gray-10);
 }

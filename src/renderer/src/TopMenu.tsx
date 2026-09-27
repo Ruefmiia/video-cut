@@ -1,25 +1,32 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { memo, useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { IoIosSettings } from 'react-icons/io';
-import { FaFilter, FaList, FaLock, FaMoon, FaSun, FaUnlock } from 'react-icons/fa';
+import { FaFilter, FaKeyboard, FaList, FaLock, FaMoon, FaSun, FaUnlock } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import Button from './components/Button';
+import Kbd from './components/Kbd';
 
 import ExportModeButton from './components/ExportModeButton';
 
-import { withBlur } from './util';
+import { splitKeyboardKeys, withBlur } from './util';
 import { primaryTextColor, controlsBackground, darkModeTransition } from './colors';
 import useUserSettings from './hooks/useUserSettings';
 import useActionTitle from './hooks/useActionTitle';
 import styles from './TopMenu.module.css';
 import OutDirSelector from './components/OutDirSelector';
-
+import type { KeyBinding } from '../../common/types';
 
 const { stat } = window.require('node:fs/promises');
 const { webUtils } = window.require('electron');
 
 const outFmtStyle = { maxWidth: 100 };
 const exportModeStyle = { flexGrow: 0, flexBasis: 140 };
+const commonShortcutActions = [
+  { action: 'setCutStart', label: 'Set cut start to current position' },
+  { action: 'setCutEnd', label: 'Set cut end to current position' },
+  { action: 'togglePlayResetSpeed', label: 'Play/pause' },
+  { action: 'goToTimecode', label: 'Seek to timecode' },
+];
 
 function TopMenu({
   filePath,
@@ -35,6 +42,7 @@ function TopMenu({
   selectedSegments,
   isCustomFormatSelected,
   toggleDarkMode,
+  keyBindingByAction,
 }: {
   filePath: string | undefined,
   fileFormat: string | undefined,
@@ -49,8 +57,10 @@ function TopMenu({
   selectedSegments: unknown[],
   isCustomFormatSelected: boolean,
   toggleDarkMode: () => void,
+  keyBindingByAction: Record<string, KeyBinding>,
 }) {
   const { t } = useTranslation();
+  const [shortcutsVisible, setShortcutsVisible] = useState(false);
   const { customOutDir, setCustomOutDir, simpleMode, outFormatLocked, setOutFormatLocked, darkMode } = useUserSettings();
   const actionTitle = useActionTitle();
   const workingDirButtonRef = useRef<HTMLButtonElement>(null);
@@ -129,6 +139,38 @@ function TopMenu({
           {customOutDir ? t('Working dir set') : t('Working dir unset')}
         </Button>
       </OutDirSelector>
+
+      <Button
+        onClick={() => setShortcutsVisible((visible) => !visible)}
+        aria-expanded={shortcutsVisible}
+        aria-controls="common-keyboard-shortcuts"
+        aria-pressed={shortcutsVisible}
+        title={t('Keyboard shortcuts')}
+      >
+        <FaKeyboard style={{ verticalAlign: 'middle', marginRight: '.35em' }} />
+        {t('Keyboard shortcuts')}
+      </Button>
+
+      {shortcutsVisible && (
+        <section id="common-keyboard-shortcuts" className={styles['shortcutsPopover']} aria-label={t('Common shortcuts')}>
+          <h2 className={styles['shortcutsTitle']}>{t('Common shortcuts')}</h2>
+          <dl className={styles['shortcutsList']}>
+            {commonShortcutActions.map(({ action, label }) => {
+              const binding = keyBindingByAction[action];
+              return (
+                <div className={styles['shortcutRow']} key={action}>
+                  <dt>{t(label)}</dt>
+                  <dd>
+                    {binding?.keys ? splitKeyboardKeys(binding.keys).map((code) => (
+                      <span className={styles['shortcutKey']} key={`${action}-${code}`}><Kbd code={code} /></span>
+                    )) : t('Not set')}
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
+        </section>
+      )}
 
       {renderOutFmt(outFmtStyle)}
 
