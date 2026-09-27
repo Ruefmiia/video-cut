@@ -1,6 +1,6 @@
 > **Video Cut — work in progress**
 >
-> This repository is a Windows-focused, beginner-friendly fork of [LosslessCut](https://github.com/mifi/lossless-cut), licensed under GPL-2.0-only. It is not an official LosslessCut release. The current changes make clip naming easier in simple mode and name separate exports by order, label, and start time. GIF export, text overlays, and burned-in subtitles are planned and are not implemented yet. See [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
+> This repository is a Windows-focused, beginner-friendly fork of [LosslessCut](https://github.com/mifi/lossless-cut), licensed under GPL-2.0-only. It is not an official LosslessCut release. The interface defaults to Simplified Chinese and focuses on naming and exporting many clips from one long video. GIF export, per-clip text overlays, and subtitle burning are implemented in the current development branch. See the [Simplified Chinese guide](README.zh-CN.md) and [development plan](DEVELOPMENT_PLAN.md).
 
 <div align="center">
 	<br>

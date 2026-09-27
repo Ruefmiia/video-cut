@@ -12,6 +12,8 @@ import FileNameTemplateEditor from './FileNameTemplateEditor';
 import HighlightedText from './HighlightedText';
 import Select from './Select';
 import Switch from './Switch';
+import Button from './Button';
+import { showOpenDialog } from '../dialogs';
 
 import { primaryTextColor, warningColor } from '../colors';
 import { withBlur } from '../util';
@@ -120,6 +122,8 @@ function ExportConfirm({
   onClosePress,
   onExportConfirm,
   outFormat,
+  sourceVideoWidth,
+  sourceVideoHeight,
   renderOutFmt,
   outputDir,
   numStreamsTotal,
@@ -147,8 +151,10 @@ function ExportConfirm({
   willMerge: boolean,
   visible: boolean,
   onClosePress: () => void,
-  onExportConfirm: () => void,
+  onExportConfirm: (options?: { subtitleFilePath?: string | undefined }) => void,
   outFormat: string | undefined,
+  sourceVideoWidth: number | undefined,
+  sourceVideoHeight: number | undefined,
   renderOutFmt: (style: CSSProperties) => ReactNode,
   outputDir: string | undefined,
   numStreamsTotal: number,
@@ -176,6 +182,16 @@ function ExportConfirm({
   const { keyframeCut, toggleKeyframeCut, preserveMovData, setPreserveMovData, preserveMetadata, setPreserveMetadata, preserveChapters, setPreserveChapters, movFastStart, setMovFastStart, avoidNegativeTs, setAvoidNegativeTs, autoDeleteMergedSegments, exportConfirmEnabled, toggleExportConfirmEnabled, segmentsToChapters, setSegmentsToChapters, preserveMetadataOnMerge, setPreserveMetadataOnMerge, enableSmartCut, setEnableSmartCut, effectiveExportMode, enableOverwriteOutput, setEnableOverwriteOutput, ffmpegExperimental, setFfmpegExperimental, cutFromAdjustmentFrames, setCutFromAdjustmentFrames, cutToAdjustmentFrames, setCutToAdjustmentFrames, setCutFileTemplate, setCutMergedFileTemplate, simpleMode, keyframesEnabled } = useUserSettings();
 
   const [showAdvanced, setShowAdvanced] = useState(!simpleMode);
+  const [subtitleFilePath, setSubtitleFilePath] = useState<string>();
+
+  const chooseSubtitle = useCallback(async () => {
+    const { canceled, filePaths } = await showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: t('Subtitle files'), extensions: ['srt', 'ass', 'ssa'] }],
+      title: t('Choose subtitle file'),
+    });
+    if (!canceled && filePaths[0]) setSubtitleFilePath(filePaths[0]);
+  }, [t]);
 
   const togglePreserveChapters = useCallback(() => setPreserveChapters((val) => !val), [setPreserveChapters]);
   const togglePreserveMovData = useCallback(() => setPreserveMovData((val) => !val), [setPreserveMovData]);
@@ -185,6 +201,12 @@ function ExportConfirm({
 
   const isMov = ffmpegIsMov(outFormat);
   const isIpod = outFormat === 'ipod';
+  const gifDurationSeconds = segmentsToExport.reduce((total, segment) => total + segment.end - segment.start, 0);
+  const scaledGifHeight = sourceVideoWidth != null && sourceVideoHeight != null && sourceVideoWidth > 0
+    ? (640 * sourceVideoHeight) / sourceVideoWidth
+    : 360;
+  const gifOutputHeight = Math.max(2, Math.round(scaledGifHeight / 2) * 2);
+  const gifRawFrameDataMb = 640 * gifOutputHeight * 12 * gifDurationSeconds * 0.000001;
 
   // some thumbnail streams (png,jpg etc) cannot always be cut correctly, so we warn if they try to.
   const areWeCuttingProblematicStreams = areWeCutting && mainCopiedThumbnailStreams.length > 0;
@@ -353,7 +375,7 @@ function ExportConfirm({
       title={t('Export options')}
       onClosePress={onClosePress}
       renderButton={() => (
-        <ExportButton segmentsToExport={segmentsToExport} areWeCutting={areWeCutting} onClick={withBlur(() => onExportConfirm())} style={{ fontSize: '1.3em' }} />
+        <ExportButton segmentsToExport={segmentsToExport} areWeCutting={areWeCutting} onClick={withBlur(() => onExportConfirm({ subtitleFilePath }))} style={{ fontSize: '1.3em' }} />
       )}
       renderBottom={() => (
         <>
@@ -369,6 +391,21 @@ function ExportConfirm({
     >
       <table className={styles['options']}>
         <tbody>
+          <tr>
+            <td>{t('Burn in subtitles')}</td>
+            <td colSpan={2}>
+              <Button onClick={chooseSubtitle} style={{ maxWidth: '22em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitleFilePath || t('Choose subtitle file')}</Button>
+              {subtitleFilePath && <Button onClick={() => setSubtitleFilePath(undefined)}>{t('Clear')}</Button>}
+            </td>
+          </tr>
+          <tr>
+            <td colSpan={3} style={{ color: 'var(--gray-11)', fontSize: '.9em' }}>{t('Burning subtitles requires re-encoding. The original video bitrate is used when available.')}</td>
+          </tr>
+          {outFormat === 'gif' && (
+            <tr>
+              <td colSpan={3} style={{ color: 'var(--gray-11)', fontSize: '.9em' }}>{t('GIF size estimate for {{duration}} seconds: about {{min}}–{{max}} MB. Actual size varies with motion and colors.', { duration: gifDurationSeconds.toFixed(1), min: (gifRawFrameDataMb * 0.1).toFixed(1), max: gifRawFrameDataMb.toFixed(1) })}</td>
+            </tr>
+          )}
           {notices.generic.map((notice) => renderGenericNotice(notice))}
 
           {segmentsOrInverse.selected.length !== segmentsOrInverse.all.length && (

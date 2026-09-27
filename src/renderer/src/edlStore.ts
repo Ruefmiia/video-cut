@@ -7,7 +7,7 @@ import { parseSrtToSegments, formatSrt, parseCuesheet, parseXmeml, parseFcpXml, 
 import { askForYouTubeInput, showOpenDialog } from './dialogs';
 import { getOutPath } from './util';
 import type { EdlExportType, EdlFileType, EdlImportType, GetFrameCount, LlcProject, SegmentBase, StateSegment } from './types';
-import { llcProjectV1Schema, llcProjectV2Schema } from './types';
+import { llcProjectV1Schema, llcProjectV2Schema, llcProjectV3Schema } from './types';
 import { mapSaveableSegments } from './segments';
 import isDev from './isDev';
 
@@ -88,7 +88,7 @@ export async function saveLlcProject({ savePath, mediaFilePath, cutSegments }: {
   cutSegments: StateSegment[],
 }) {
   const projectData: LlcProject = {
-    version: 2,
+    version: 3,
     mediaFileName: basename(mediaFilePath),
     cutSegments: mapSaveableSegments(cutSegments),
   };
@@ -101,20 +101,26 @@ export async function loadLlcProject(path: string) {
   async function doLoad(): Promise<LlcProject> {
     // todo probably remove migration in future
     try {
-      return llcProjectV2Schema.parse(json);
+      return llcProjectV3Schema.parse(json);
     } catch (err) {
       if (err instanceof ZodError) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { cutSegments, version: _ignored, ...restProject } = llcProjectV1Schema.parse(json);
-        console.log('Converting v1 project to v2');
-        return {
-          ...restProject,
-          version: 2,
-          cutSegments: cutSegments.map(({ start, ...restSeg }) => ({
-            ...restSeg,
-            start: start ?? 0, // v1 allowed undefined for "start", which we no longer allow as of v2
-          })),
-        };
+        try {
+          const v2Project = llcProjectV2Schema.parse(json);
+          return { ...v2Project, version: 3 };
+        } catch (v2Error) {
+          if (!(v2Error instanceof ZodError)) throw v2Error;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { cutSegments, version: _ignored, ...restProject } = llcProjectV1Schema.parse(json);
+          console.log('Converting v1 project to v3');
+          return {
+            ...restProject,
+            version: 3,
+            cutSegments: cutSegments.map(({ start, ...restSeg }) => ({
+              ...restSeg,
+              start: start ?? 0, // v1 allowed undefined for "start", which we no longer allow as of v2
+            })),
+          };
+        }
       }
       throw err;
     }

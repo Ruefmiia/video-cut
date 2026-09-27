@@ -50,7 +50,23 @@ export const llcProjectV2Schema = z.object({
   }).array(),
 });
 
-export type LlcProject = z.infer<typeof llcProjectV2Schema>
+export const segmentOverlaySchema = z.object({ text: z.string().optional(), textDurationSeconds: z.number().positive().optional(), subtitleFilePath: z.string().optional() });
+export type SegmentOverlay = z.infer<typeof segmentOverlaySchema>;
+
+export const llcProjectV3Schema = z.object({
+  version: z.literal(3),
+  mediaFileName: z.string().optional(),
+  cutSegments: z.object({
+    start: z.number(),
+    end: z.number().optional(),
+    name: z.string(),
+    tags: segmentTagsSchema.optional(),
+    selected: z.boolean().optional(),
+    overlay: segmentOverlaySchema.optional(),
+  }).array(),
+});
+
+export type LlcProject = z.infer<typeof llcProjectV3Schema>
 
 export interface SegmentBase {
   start: number,
@@ -71,6 +87,7 @@ export interface StateSegment extends SegmentBase, SegmentColorIndex {
   name: string;
   segId: string;
   tags?: SegmentTags | undefined;
+  overlay?: SegmentOverlay | undefined;
   initial?: true,
   selected: boolean,
 }
@@ -79,6 +96,7 @@ export interface SegmentToExport extends DefiniteSegmentBase {
   originalIndex: number,
   name?: string | undefined;
   tags?: SegmentTags | undefined;
+  overlay?: SegmentOverlay | undefined;
 }
 
 export interface InverseCutSegment extends DefiniteSegmentBase {
@@ -145,7 +163,7 @@ export type CopyfileStreams = {
 
 export interface Chapter { start: number, end: number, name?: string | undefined }
 
-export type LiteFFprobeStream = Pick<FFprobeStream, 'index' | 'codec_type' | 'codec_tag' | 'codec_name' | 'disposition' | 'tags' | 'sample_rate' | 'time_base'>;
+export type LiteFFprobeStream = Pick<FFprobeStream, 'index' | 'codec_type' | 'codec_tag' | 'codec_name' | 'disposition' | 'tags' | 'sample_rate' | 'time_base' | 'bit_rate'>;
 
 export interface FileStats {
   size: number | bigint,

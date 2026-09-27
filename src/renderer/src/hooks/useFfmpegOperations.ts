@@ -254,7 +254,7 @@ function useFfmpegOperations({ filePath, treatInputFileModifiedTimeAsStart, trea
 
   const losslessCutSingle = useCallback(async ({
     keyframeCut: ssBeforeInput, avoidNegativeTs, copyFileStreams, cutFrom, cutTo, chaptersPath, onProgress, outPath,
-    fileDuration, rotation, allFilesMeta, outFormat, shortestFlag, ffmpegExperimental, preserveMetadata, preserveMovData, preserveChapters, movFastStart, paramsByFile, videoTimebase, detectedFps,
+    fileDuration, rotation, allFilesMeta, outFormat, shortestFlag, ffmpegExperimental, preserveMetadata, preserveMovData, preserveChapters, movFastStart, paramsByFile, videoTimebase, detectedFps, subtitleFilePath, overlayText, overlayDurationSeconds,
   }: {
     keyframeCut: boolean,
     avoidNegativeTs: AvoidNegativeTs | undefined,
@@ -277,6 +277,9 @@ function useFfmpegOperations({ filePath, treatInputFileModifiedTimeAsStart, trea
     paramsByFile: ParamsByFile,
     videoTimebase?: number | undefined,
     detectedFps?: number,
+    subtitleFilePath?: string | undefined,
+    overlayText?: string | undefined,
+    overlayDurationSeconds?: number | undefined,
   }) => {
     const frameDuration = getFrameDuration(detectedFps);
 
@@ -304,6 +307,7 @@ function useFfmpegOperations({ filePath, treatInputFileModifiedTimeAsStart, trea
 
     // If cutting multiple files, `-ss` must be before `-i`, regardless of `ssBeforeInput` choice
     // and it seems that `-t` must be after `-i` #896
+    const inputSeekBeforeInput = ssBeforeInput || subtitleFilePath != null;
     const inputFilesArgs = copyFileStreamsFiltered.length > 1
       ? copyFileStreamsFiltered.flatMap(({ streamIds, path }) => {
         const fileParams = paramsByFile.get(path);
@@ -323,9 +327,9 @@ function useFfmpegOperations({ filePath, treatInputFileModifiedTimeAsStart, trea
         ];
       })
       : [
-        ...(ssBeforeInput ? cutFromArgs : []),
+        ...(inputSeekBeforeInput ? cutFromArgs : []),
         '-i', copyFileStreamsFiltered[0]!.path,
-        ...(!ssBeforeInput ? cutFromArgs : []),
+        ...(!inputSeekBeforeInput ? cutFromArgs : []),
         ...cutToArgs,
       ];
 
@@ -358,10 +362,47 @@ function useFfmpegOperations({ filePath, treatInputFileModifiedTimeAsStart, trea
       '-metadata', `${key}=${value}`,
     ]);
 
-    const mapStreamsArgs = getMapStreamsArgs({ copyFileStreams: copyFileStreamsFiltered, allFilesMeta, outFormat, needFlac: areWeCutting });
+    const isGifExport = outFormat === 'gif';
+    const isFilteredExport = isGifExport || subtitleFilePath != null || Boolean(overlayText?.trim());
+    const mainFileInputIndex = copyFileStreamsFiltered.findIndex(({ path }) => path === filePath);
+    invariant(!isFilteredExport || mainFileInputIndex !== -1, 'Filtered export requires the main video file');
+    const mainVideoStream = allFilesMeta[filePath]?.streams.find((stream) => stream.codec_type === 'video' && stream.disposition?.attached_pic !== 1);
+    invariant(!isFilteredExport || mainVideoStream != null, 'Filtered export requires a video stream');
+    const backslash = String.fromCodePoint(92);
+    const escapeFilterValue = (value: string, charsToEscape: string[]) => {
+      let escaped = value.replaceAll(backslash, backslash + backslash);
+      for (const char of charsToEscape) escaped = escaped.replaceAll(char, backslash + char);
+      return escaped;
+    };
+    const baseVideoFilters = [
+      ...(subtitleFilePath ? [
+        `setpts=PTS+${formatFfmpegNumber(cutFromWithAdjustment)}/TB`,
+        `subtitles=filename='${escapeFilterValue(subtitleFilePath.replaceAll(backslash, '/'), [':', "'"])}'`,
+        `setpts=PTS-${formatFfmpegNumber(cutFromWithAdjustment)}/TB`,
+      ] : []),
+      ...(overlayText?.trim() ? [`drawtext=fontfile='C${backslash}:/Windows/Fonts/msyh.ttc':text='${escapeFilterValue(overlayText.trim(), [':', "'", '%', ',', ';'])}':x=(w-text_w)/2:y=h-text_h-24:fontsize=36:fontcolor=white:borderw=2:bordercolor=black${overlayDurationSeconds != null ? `:enable='lt(t,${formatFfmpegNumber(overlayDurationSeconds)})'` : ''}`] : []),
+    ];
+    const filterGraph = isFilteredExport
+      ? `[${mainFileInputIndex}:${mainVideoStream?.index ?? 0}]${[
+        ...baseVideoFilters,
+        ...(isGifExport ? ['fps=12', 'scale=640:-2:flags=lanczos', 'split[gif_src][gif_palette_src]'] : []),
+      ].join(',')}${isGifExport ? ';[gif_palette_src]palettegen=reserve_transparent=0[gif_palette];[gif_src][gif_palette]paletteuse=dither=sierra2_4a[gif]' : '[filtered]'}`
+      : undefined;
+    const sourceVideoBitrate = Number(mainVideoStream?.bit_rate);
+    const selectedAudioMapArgs = copyFileStreamsFiltered.flatMap(({ path, streamIds }, inputIndex) => (
+      streamIds.flatMap((streamId) => (
+        allFilesMeta[path]?.streams.find((stream) => stream.index === streamId)?.codec_type === 'audio'
+          ? ['-map', `${inputIndex}:${streamId}`]
+          : []
+      ))
+    ));
+    const mapStreamsArgs = isFilteredExport
+      ? ['-map', isGifExport ? '[gif]' : '[filtered]', ...(isGifExport ? [] : selectedAudioMapArgs)]
+      : getMapStreamsArgs({ copyFileStreams: copyFileStreamsFiltered, allFilesMeta, outFormat, needFlac: areWeCutting });
 
     const customParamsArgs = (() => {
       const ret: string[] = [];
+      if (isFilteredExport) return ret;
       for (const [fileId, { paramsByStream }] of paramsByFile.entries()) {
         for (const [streamId, streamParams] of paramsByStream.entries()) {
           const outputIndex = mapInputStreamIndexToOutputIndex(fileId, streamId);
@@ -462,9 +503,14 @@ function useFfmpegOperations({ filePath, treatInputFileModifiedTimeAsStart, trea
       ...inputFilesArgs,
       ...getChaptersInputArgs(chaptersPath),
 
+      ...(filterGraph ? ['-filter_complex', filterGraph] : []),
+
       ...avoidNegativeTsArgs,
 
       ...mapStreamsArgs,
+
+      ...(isGifExport ? ['-an', '-loop', '0'] : []),
+      ...(isFilteredExport && !isGifExport ? ['-c:v', 'libx264', '-preset', 'veryfast', ...(Number.isFinite(sourceVideoBitrate) && sourceVideoBitrate > 0 ? ['-b:v', String(sourceVideoBitrate)] : ['-crf', '18']), '-c:a', 'copy'] : []),
 
       ...getPreserveMetadata(),
 
@@ -564,7 +610,7 @@ function useFfmpegOperations({ filePath, treatInputFileModifiedTimeAsStart, trea
   }, [appendFfmpegCommandLog, filePath]);
 
   const cutMultiple = useCallback(async ({
-    outputDir, customOutDir, segments: segmentsIn, cutFileNames, fileDuration, rotation, detectedFps, onProgress: onTotalProgress, keyframeCut, copyFileStreams, allFilesMeta, outFormat, shortestFlag, ffmpegExperimental, preserveMetadata, preserveMetadataOnMerge, preserveMovData, preserveChapters, movFastStart, avoidNegativeTs, paramsByFile, chapters,
+    outputDir, customOutDir, segments: segmentsIn, cutFileNames, fileDuration, rotation, detectedFps, onProgress: onTotalProgress, keyframeCut, copyFileStreams, allFilesMeta, outFormat, shortestFlag, ffmpegExperimental, preserveMetadata, preserveMetadataOnMerge, preserveMovData, preserveChapters, movFastStart, avoidNegativeTs, paramsByFile, chapters, subtitleFilePath,
   }: {
     outputDir: string,
     customOutDir: string | undefined,
@@ -588,6 +634,7 @@ function useFfmpegOperations({ filePath, treatInputFileModifiedTimeAsStart, trea
     avoidNegativeTs: AvoidNegativeTs | undefined,
     paramsByFile: ParamsByFile,
     chapters: Chapter[] | undefined,
+    subtitleFilePath?: string | undefined,
   }) => {
     console.log('paramsByFile', paramsByFile);
 
@@ -608,7 +655,8 @@ function useFfmpegOperations({ filePath, treatInputFileModifiedTimeAsStart, trea
     // or if enabled, will first cut&encode the part before the next keyframe, trying to match the input file's codec params
     // then it will cut the part *from* the keyframe to "end", and concat them together and return the concated file
     // so that for the calling code it looks as if it's just a normal segment
-    const cutSegment = async ({ start: desiredCutFrom, end: cutTo }: { start: number, end: number }, i: number) => {
+    const cutSegment = async (segment: SegmentToExport, i: number) => {
+      const { start: desiredCutFrom, end: cutTo } = segment;
       const onProgress = (progress: number) => onSingleProgress(i, progress / 2);
       const onConcatProgress = (progress: number) => onSingleProgress(i, (1 + progress) / 2);
 
@@ -618,11 +666,12 @@ function useFfmpegOperations({ filePath, treatInputFileModifiedTimeAsStart, trea
 
       await maybeMkDeepOutDir({ outputDir, fileOutPath: finalOutPath });
 
-      if (!isEncoding) {
+      const segmentSubtitleFilePath = segment.overlay?.subtitleFilePath ?? subtitleFilePath;
+      if (!isEncoding || outFormat === 'gif' || segmentSubtitleFilePath != null || Boolean(segment.overlay?.text?.trim())) {
         // simple lossless cut
         invariant(outFormat != null);
         await losslessCutSingle({
-          cutFrom: desiredCutFrom, cutTo, chaptersPath, outPath: finalOutPath, copyFileStreams, keyframeCut, avoidNegativeTs, fileDuration, rotation, allFilesMeta, outFormat, shortestFlag, ffmpegExperimental, preserveMetadata, preserveMovData, preserveChapters, movFastStart, paramsByFile, onProgress: (progress) => onSingleProgress(i, progress),
+          cutFrom: desiredCutFrom, cutTo, chaptersPath, outPath: finalOutPath, copyFileStreams, keyframeCut, avoidNegativeTs, fileDuration, rotation, allFilesMeta, outFormat, shortestFlag, ffmpegExperimental, preserveMetadata, preserveMovData, preserveChapters, movFastStart, paramsByFile, onProgress: (progress) => onSingleProgress(i, progress), subtitleFilePath: segmentSubtitleFilePath, overlayText: segment.overlay?.text, overlayDurationSeconds: segment.overlay?.textDurationSeconds,
         });
         return { path: finalOutPath, created: true };
       }

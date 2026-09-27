@@ -11,10 +11,11 @@ const commonVideoAudioFormats = ['matroska', 'mov', 'mp4', 'mpegts', 'ogv', 'web
 const commonAudioFormats = ['flac', 'ipod', 'mp3', 'oga', 'ogg', 'opus', 'wav'] as const;
 const commonSubtitleFormats = ['ass', 'srt', 'sup', 'webvtt'] as const;
 
-function renderFormatOptions(formats: FfmpegFormat[]) {
-  return formats.map((format) => (
-    <option key={format} value={format}>{format} - {allOutFormats[format]}</option>
-  ));
+function renderFormatOptions(formats: FfmpegFormat[], gifLabel: string) {
+  return formats.map((format) => {
+    const label = format === 'gif' ? gifLabel : `${format} - ${allOutFormats[format]}`;
+    return <option key={format} value={format}>{label}</option>;
+  });
 }
 
 function OutputFormatSelect({ style, disabled, detectedFileFormat, fileFormat, onOutputFormatUserChange }: {
@@ -25,6 +26,7 @@ function OutputFormatSelect({ style, disabled, detectedFileFormat, fileFormat, o
   onOutputFormatUserChange: (a: string) => void,
 }) {
   const { t } = useTranslation();
+  const gifLabel = t('GIF animation (automatic optimization)');
 
   const commonVideoAudioFormatsExceptDetectedFormat = useMemo(() => commonVideoAudioFormats.filter((f) => f !== detectedFileFormat), [detectedFileFormat]);
   const commonAudioFormatsExceptDetectedFormat = useMemo(() => commonAudioFormats.filter((f) => f !== detectedFileFormat), [detectedFileFormat]);
@@ -45,16 +47,16 @@ function OutputFormatSelect({ style, disabled, detectedFileFormat, fileFormat, o
       )}
 
       <option key="disabled2" value="" disabled>--- {t('Common video/audio formats:')} ---</option>
-      {renderFormatOptions(commonVideoAudioFormatsExceptDetectedFormat)}
+      {renderFormatOptions(commonVideoAudioFormatsExceptDetectedFormat, gifLabel)}
 
       <option key="disabled3" value="" disabled>--- {t('Common audio formats:')} ---</option>
-      {renderFormatOptions(commonAudioFormatsExceptDetectedFormat)}
+      {renderFormatOptions(commonAudioFormatsExceptDetectedFormat, gifLabel)}
 
       <option key="disabled4" value="" disabled>--- {t('Common subtitle formats:')} ---</option>
-      {renderFormatOptions(commonSubtitleFormatsExceptDetectedFormat)}
+      {renderFormatOptions(commonSubtitleFormatsExceptDetectedFormat, gifLabel)}
 
       <option key="disabled5" value="" disabled>--- {t('All other formats:')} ---</option>
-      {renderFormatOptions(otherFormats)}
+      {renderFormatOptions(otherFormats, gifLabel)}
     </Select>
   );
 }

@@ -14,6 +14,7 @@ export const createSegment = (props?: {
   end?: number | undefined,
   name?: string | undefined,
   tags?: unknown | undefined,
+  overlay?: StateSegment['overlay'] | undefined,
   initial?: true,
   selected?: boolean,
 }): Omit<StateSegment, 'segColorIndex'> => ({
@@ -28,6 +29,7 @@ export const createSegment = (props?: {
   tags: props?.tags != null && typeof props.tags === 'object'
     ? Object.fromEntries(Object.entries(props.tags).map(([key, value]) => [key, String(value)]))
     : undefined,
+  overlay: props?.overlay,
 
   ...(props?.initial && { initial: true }),
 });
@@ -38,9 +40,9 @@ export const addSegmentColorIndex = (segment: Omit<StateSegment, 'segColorIndex'
 });
 
 export const mapSaveableSegments = (segments: StateSegment[]) => segments.map(({
-  start, end, name, tags, selected,
+  start, end, name, tags, selected, overlay,
 }) => ({
-  start, end, name, tags, selected,
+  start, end, name, tags, selected, overlay,
 }));
 
 // in the past we had non-string tags

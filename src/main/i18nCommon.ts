@@ -1,4 +1,4 @@
-// intentionally disabled because I don't know the quality of the languages, so better to default to english
+// Chinese is the default language for this beginner-focused fork.
 // const LanguageDetector = window.require('i18next-electron-language-detector');
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { app } from 'electron';
@@ -20,7 +20,7 @@ function getLangPath(subPath: string) {
   return join('locales', subPath);
 }
 
-export const fallbackLng = 'en';
+export const fallbackLng = 'zh-CN';
 
 export const commonI18nOptions: InitOptions = {
   fallbackLng,

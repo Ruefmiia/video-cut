@@ -66,7 +66,7 @@ import {
 } from './ffmpeg';
 import { shouldCopyStreamByDefault, getAudioStreams, getRealVideoStreams, isAudioDefinitelyNotSupported, willPlayerProperlyHandleVideo, doesPlayerSupportHevcPlayback, getSubtitleStreams, enableVideoTrack, enableAudioTrack, canHtml5PlayerPlayStreams, isMatroska } from './util/streams';
 import { exportEdlFile, readEdlFile, loadLlcProject, askForEdlImport } from './edlStore';
-import { formatYouTube, getFrameCountRaw, formatTsvHuman } from './edlFormats';
+import { formatYouTube, getFrameCountRaw, formatTsvHuman, parseSrt } from './edlFormats';
 import {
   getOutPath, getOutDir,
   isStoreBuild, dragPreventer,
@@ -124,7 +124,7 @@ import type { AppEvent } from '../../main/index.js';
 import { appName } from '../../main/common.js';
 
 const { ipcRenderer, webUtils } = window.require('electron');
-const { lstat, mkdir } = window.require('node:fs/promises');
+const { lstat, mkdir, readFile } = window.require('node:fs/promises');
 const { parse: parsePath, join: pathJoin, basename, dirname } = window.require('node:path');
 const { hasDisabledNetworking, pathToFileURL, lossyMode, isLinux } = window.require('@electron/remote').require('./index.js');
 
@@ -354,6 +354,38 @@ function App() {
   const {
     cutSegments, cutSegmentsHistory, createSegmentsFromKeyframes, shuffleSegments, detectBlackScenes, detectSilentScenes, detectSceneChanges, removeSegment, invertAllSegments, fillSegmentsGaps, combineOverlappingSegments, combineSelectedSegments, modifySelectedSegmentTimes, alignSegmentTimesToKeyframes, updateSegOrder, updateSegOrders, reorderSegsByStartTime, addSegment, setCutStart, setCutEnd, labelSegment, splitCurrentSegment, focusSegmentAtCursor, selectSegmentsAtCursor, createNumSegments, createFixedDurationSegments, createFixedByteSizedSegments, createRandomSegments, getSegEstimatedSize, haveInvalidSegs, currentSegIndexSafe, currentCutSeg, inverseCutSegments, clearSegments, clearSegColorCounter, loadCutSegments, setCutTime, setCurrentSegIndex, labelSelectedSegments, deselectAllSegments, selectAllSegments, selectOnlyCurrentSegment, toggleCurrentSegmentSelected, invertSelectedSegments, removeSelectedSegments, selectSegmentsByLabel, selectSegmentsByExpr, selectAllMarkers, mutateSegmentsByExpr, toggleSegmentSelected, selectOnlySegment, selectedSegments, segmentsOrInverse, segmentsToExport, duplicateCurrentSegment, duplicateSegment, updateSegAtIndex, findSegmentsAtCursor, maybeCreateFullLengthSegment, currentCutSegOrWholeTimeline, segColorCounter,
   } = useSegments({ filePath, workingRef, setWorking, setProgress, videoStream: activeVideoStream, fileDuration, getRelevantTime, maxLabelLength, checkFileOpened, invertCutSegments, segmentsToChaptersOnly, timecodePlaceholder, parseTimecode, appendFfmpegCommandLog, fileDurationNonZero, mainFileMeta: mainFileMeta?.ffprobeMeta, seekAbs, activeVideoStreamIndex, activeAudioStreamIndexes, handleError, showGenericDialog, simpleMode, ffmpegHwaccel });
+
+  const [externalSubtitleTrack, setExternalSubtitleTrack] = useState<{ path: string, url: string }>();
+  const segmentSubtitlePath = currentCutSeg?.overlay?.subtitleFilePath;
+  useEffect(() => {
+    if (!segmentSubtitlePath) return undefined;
+
+    let canceled = false;
+    let objectUrl: string | undefined;
+    (async () => {
+      try {
+        const srt = await readFile(segmentSubtitlePath, 'utf8');
+        const formatTimestamp = (seconds: number) => {
+          const milliseconds = Math.max(0, Math.round(seconds * 1000));
+          const hours = Math.floor(milliseconds / 3_600_000);
+          const minutes = Math.floor((milliseconds % 3_600_000) / 60_000);
+          const secs = Math.floor((milliseconds % 60_000) / 1000);
+          const millis = milliseconds % 1000;
+          return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+        };
+        const cues = parseSrt(srt).map(({ start, end, lines }) => `${formatTimestamp(start)} --> ${formatTimestamp(end)}\n${lines.join('\n')}`);
+        objectUrl = URL.createObjectURL(new Blob([`WEBVTT\n\n${cues.join('\n\n')}`], { type: 'text/vtt' }));
+        if (canceled) URL.revokeObjectURL(objectUrl);
+        else setExternalSubtitleTrack({ path: segmentSubtitlePath, url: objectUrl });
+      } catch (error) {
+        console.error('Failed to load segment subtitle', error);
+      }
+    })();
+    return () => {
+      canceled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [segmentSubtitlePath]);
 
   const { getEdlFilePath, projectFileSavePath, getProjectFileSavePath } = useSegmentsAutoSave({ autoSaveProjectFile, storeProjectInWorkingDir, filePath, customOutDir, cutSegments });
 
@@ -1059,8 +1091,23 @@ function App() {
 
   const willMerge = segmentsToExport.length > 1 && autoMerge;
 
-  const onExportConfirm = useCallback(async () => {
+  const onExportConfirm = useCallback(async (mediaOverlays?: { subtitleFilePath?: string | undefined }) => {
     invariant(filePath != null && outputDir != null && cutOutputDir != null);
+
+    const subtitlePaths = [...new Set(segmentsToExport.map((segment) => segment.overlay?.subtitleFilePath ?? mediaOverlays?.subtitleFilePath).filter((path): path is string => path != null))];
+    const missingSubtitlePaths = (await Promise.all(subtitlePaths.map(async (path) => {
+      try {
+        await lstat(path);
+        return undefined;
+      } catch {
+        return path;
+      }
+    }))).filter((path): path is string => path != null);
+    if (missingSubtitlePaths.length > 0) {
+      await getSwal().Swal.fire({ icon: 'error', title: t('Subtitle file not found'), text: missingSubtitlePaths.join('\n') });
+      return;
+    }
+
     emitEvent({ eventName: 'export-start', path: filePath });
 
     if (numStreamsToCopy === 0) {
@@ -1136,6 +1183,7 @@ function App() {
         movFastStart,
         avoidNegativeTs,
         paramsByFile,
+        subtitleFilePath: mediaOverlays?.subtitleFilePath,
         chapters: chaptersToAdd,
         detectedFps,
       });
@@ -2510,6 +2558,9 @@ function App() {
   const showLeftBar = batchFiles.length > 0;
 
   function renderSubtitles() {
+    if (segmentSubtitlePath && externalSubtitleTrack?.path === segmentSubtitlePath) {
+      return <track key={externalSubtitleTrack.path} default kind="subtitles" label={t('Segment subtitle')} srcLang="zh" src={externalSubtitleTrack.url} />;
+    }
     if (!activeSubtitle) return null;
     return <track default kind="subtitles" label={activeSubtitle.lang} srcLang="en" src={activeSubtitle.url} />;
   }
@@ -2592,6 +2643,15 @@ function App() {
                       >
                         {renderSubtitles()}
                       </video>
+
+                      {currentCutSeg?.overlay?.text && relevantTime >= currentCutSeg.start && relevantTime <= Math.min(currentCutSeg.end ?? Number.POSITIVE_INFINITY, currentCutSeg.start + (currentCutSeg.overlay.textDurationSeconds ?? Number.POSITIVE_INFINITY)) && (
+                        <div
+                          aria-label={t('Text overlay preview')}
+                          style={{ position: 'absolute', left: 0, right: 0, bottom: '8%', zIndex: 2, padding: '0 .5em', textAlign: 'center', color: 'white', fontSize: 'clamp(20px, 3vw, 36px)', fontWeight: 600, whiteSpace: 'pre-wrap', textShadow: '0 2px 5px black, 0 0 3px black', pointerEvents: 'none' }}
+                        >
+                          {currentCutSeg.overlay.text}
+                        </div>
+                      )}
 
                       {filePath != null && compatPlayerEnabled && <MediaSourcePlayer rotate={effectiveRotation} filePath={filePath} videoStream={activeVideoStream} audioStreams={activeAudioStreams} masterVideoRef={videoRef} mediaSourceQuality={mediaSourceQuality} ffmpegHwaccel={ffmpegHwaccel} />}
                     </div>
@@ -2787,7 +2847,7 @@ function App() {
 
                 {/* Dialogs */}
 
-      <ExportConfirm areWeCutting={areWeCutting} segmentsOrInverse={segmentsOrInverse} segmentsToExport={segmentsToExport} willMerge={willMerge} visible={exportConfirmOpen} onClosePress={closeExportConfirm} onExportConfirm={onExportConfirm} renderOutFmt={renderOutFmt} outputDir={cutOutputDir} numStreamsTotal={numStreamsTotal} numStreamsToCopy={numStreamsToCopy} onShowStreamsSelectorClick={handleShowStreamsSelectorClick} outFormat={fileFormat} cutFileTemplate={cutFileTemplateOrDefault} cutMergedFileTemplate={cutMergedFileTemplateOrDefault} generateCutFileNames={generateCutFileNames} generateCutMergedFileNames={generateCutMergedFileNames} currentSegIndexSafe={currentSegIndexSafe} mainCopiedThumbnailStreams={mainCopiedThumbnailStreams} needSmartCut={needSmartCut} isEncoding={isEncoding} encBitrate={encBitrate} setEncBitrate={setEncBitrate} toggleSettings={toggleSettings} outputPlaybackRate={outputPlaybackRate} lossyMode={lossyMode} neighbouringKeyFrames={neighbouringKeyFrames} findNearestKeyFrameTime={findNearestKeyFrameTime} />
+                <ExportConfirm areWeCutting={areWeCutting} segmentsOrInverse={segmentsOrInverse} segmentsToExport={segmentsToExport} willMerge={willMerge} visible={exportConfirmOpen} onClosePress={closeExportConfirm} onExportConfirm={onExportConfirm} renderOutFmt={renderOutFmt} outputDir={cutOutputDir} numStreamsTotal={numStreamsTotal} numStreamsToCopy={numStreamsToCopy} onShowStreamsSelectorClick={handleShowStreamsSelectorClick} outFormat={fileFormat} sourceVideoWidth={activeVideoStream?.width} sourceVideoHeight={activeVideoStream?.height} cutFileTemplate={cutFileTemplateOrDefault} cutMergedFileTemplate={cutMergedFileTemplateOrDefault} generateCutFileNames={generateCutFileNames} generateCutMergedFileNames={generateCutMergedFileNames} currentSegIndexSafe={currentSegIndexSafe} mainCopiedThumbnailStreams={mainCopiedThumbnailStreams} needSmartCut={needSmartCut} isEncoding={isEncoding} encBitrate={encBitrate} setEncBitrate={setEncBitrate} toggleSettings={toggleSettings} outputPlaybackRate={outputPlaybackRate} lossyMode={lossyMode} neighbouringKeyFrames={neighbouringKeyFrames} findNearestKeyFrameTime={findNearestKeyFrameTime} />
 
                 <Dialog.Root open={streamsSelectorShown} onOpenChange={setStreamsSelectorShown}>
                   <Dialog.Portal>

@@ -1,6 +1,6 @@
 import type { SetStateAction, Dispatch, MouseEventHandler, CSSProperties } from 'react';
 import { memo, useMemo, useRef, useCallback, useState, useEffect } from 'react';
-import { FaYinYang, FaSave, FaPlus, FaMinus, FaTag, FaSortNumericDown, FaRegCheckCircle, FaRegCircle, FaTimes } from 'react-icons/fa';
+import { FaYinYang, FaSave, FaPlus, FaMinus, FaTag, FaFont, FaClosedCaptioning, FaSortNumericDown, FaRegCheckCircle, FaRegCircle, FaTimes } from 'react-icons/fa';
 import { AiOutlineSplitCells } from 'react-icons/ai';
 import { motion } from 'motion/react';
 import { useTranslation, Trans } from 'react-i18next';
@@ -25,6 +25,9 @@ import type { UseSegments } from './hooks/useSegments';
 import * as Dialog from './components/Dialog';
 import { DialogButton } from './components/Button';
 import getSwal from './swal';
+import { showOpenDialog } from './dialogs';
+
+const { basename } = window.require('node:path');
 
 
 const buttonBaseStyle: CSSProperties = {
@@ -434,6 +437,61 @@ function SegmentList({
     }
   }, [cutSegments.length, t, updateSegOrder]);
 
+  const onEditCurrentOverlay = useCallback(async () => {
+    if (currentCutSeg == null) return;
+    const { isConfirmed, value } = await getSwal().Swal.fire({
+      title: t('Text overlay for segment {{segmentNumber}}', { segmentNumber: currentSegIndex + 1 }),
+      input: 'textarea',
+      inputValue: currentCutSeg.overlay?.text ?? '',
+      inputPlaceholder: t('Text shown while this segment plays'),
+      showCancelButton: true,
+      confirmButtonText: t('Save'),
+    });
+    if (!isConfirmed) return;
+    const text = String(value ?? '').trim();
+    if (text) {
+      const segmentDuration = currentCutSeg.end == null ? undefined : currentCutSeg.end - currentCutSeg.start;
+      const durationResult = await getSwal().Swal.fire({
+        title: t('Text display duration in seconds'),
+        input: 'number',
+        inputValue: currentCutSeg.overlay?.textDurationSeconds ?? segmentDuration ?? 5,
+        inputAttributes: { min: '0.1', ...(segmentDuration != null ? { max: String(segmentDuration) } : {}), step: '0.1' },
+        inputValidator: (durationValue) => {
+          const duration = Number(durationValue);
+          return !Number.isFinite(duration) || duration <= 0 || (segmentDuration != null && duration > segmentDuration) ? t('Enter a duration within the segment length') : undefined;
+        },
+        text: t('Text starts when the segment starts. Set the full segment length to keep it visible throughout.'),
+        showCancelButton: true,
+        confirmButtonText: t('Save'),
+      });
+      if (!durationResult.isConfirmed) return;
+      updateSegAtIndex(currentSegIndex, { overlay: { ...currentCutSeg.overlay, text, textDurationSeconds: Number(durationResult.value) } });
+    } else {
+      const overlay = { ...currentCutSeg.overlay };
+      delete overlay.text;
+      delete overlay.textDurationSeconds;
+      updateSegAtIndex(currentSegIndex, { overlay: overlay.subtitleFilePath ? overlay : undefined });
+    }
+  }, [currentCutSeg, currentSegIndex, t, updateSegAtIndex]);
+
+  const onChooseCurrentSubtitle = useCallback(async () => {
+    if (currentCutSeg == null) return;
+    const { canceled, filePaths } = await showOpenDialog({
+      properties: ['openFile'],
+      title: t('Choose subtitle file'),
+      filters: [{ name: 'SubRip subtitles', extensions: ['srt'] }],
+    });
+    if (canceled || !filePaths[0]) return;
+    updateSegAtIndex(currentSegIndex, { overlay: { ...currentCutSeg.overlay, subtitleFilePath: filePaths[0] } });
+  }, [currentCutSeg, currentSegIndex, t, updateSegAtIndex]);
+
+  const onClearCurrentSubtitle = useCallback(() => {
+    if (currentCutSeg == null) return;
+    const overlay = { ...currentCutSeg.overlay };
+    delete overlay.subtitleFilePath;
+    updateSegAtIndex(currentSegIndex, { overlay: overlay.text ? overlay : undefined });
+  }, [currentCutSeg, currentSegIndex, updateSegAtIndex]);
+
   function renderFooter() {
     return (
       <>
@@ -482,6 +540,49 @@ function SegmentList({
               role="button"
               style={{ ...buttonBaseStyle, padding: 5, ...(cutSegments.length > 0 ? { backgroundColor: currentSegColor } : disabledButtonStyle) }}
               onClick={() => onLabelSegment(currentSegIndex)}
+            />
+          ))}
+
+          {!invertCutSegments && (simpleMode ? (
+            <button
+              type="button"
+              disabled={currentCutSeg == null}
+              title={t('Text overlay for segment {{segmentNumber}}', { segmentNumber: currentSegIndex + 1 })}
+              onClick={onEditCurrentOverlay}
+              style={{ ...buttonBaseStyle, border: 0, padding: '5px 8px', backgroundColor: currentSegColor, opacity: currentCutSeg ? 1 : 0.5, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+            >
+              <FaFont aria-hidden="true" />
+              {currentCutSeg?.overlay?.text ? t('Edit text') : t('Add text')}
+            </button>
+          ) : (
+            <FaFont
+              size={18}
+              title={t('Text overlay for segment {{segmentNumber}}', { segmentNumber: currentSegIndex + 1 })}
+              role="button"
+              style={{ ...buttonBaseStyle, padding: 5, ...(currentCutSeg ? { backgroundColor: currentSegColor } : disabledButtonStyle) }}
+              onClick={onEditCurrentOverlay}
+            />
+          ))}
+
+          {!invertCutSegments && (simpleMode ? (
+            <button
+              type="button"
+              disabled={currentCutSeg == null}
+              title={t('Subtitle for segment {{segmentNumber}}', { segmentNumber: currentSegIndex + 1 })}
+              onClick={onChooseCurrentSubtitle}
+              style={{ ...buttonBaseStyle, border: 0, padding: '5px 8px', backgroundColor: currentSegColor, opacity: currentCutSeg ? 1 : 0.5, display: 'inline-flex', alignItems: 'center', gap: 5, maxWidth: 150, overflow: 'hidden' }}
+            >
+              <FaClosedCaptioning aria-hidden="true" />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentCutSeg?.overlay?.subtitleFilePath ? basename(currentCutSeg.overlay.subtitleFilePath) : t('Add subtitle')}</span>
+              {currentCutSeg?.overlay?.subtitleFilePath && <FaTimes role="button" title={t('Clear')} onClick={(event) => { event.stopPropagation(); onClearCurrentSubtitle(); }} />}
+            </button>
+          ) : (
+            <FaClosedCaptioning
+              size={18}
+              title={t('Subtitle for segment {{segmentNumber}}', { segmentNumber: currentSegIndex + 1 })}
+              role="button"
+              style={{ ...buttonBaseStyle, padding: 5, ...(currentCutSeg ? { backgroundColor: currentSegColor } : disabledButtonStyle) }}
+              onClick={onChooseCurrentSubtitle}
             />
           ))}
 
