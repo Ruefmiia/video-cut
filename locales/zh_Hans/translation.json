@@ -1,5 +1,6 @@
 {
   "Burn in subtitles": "烧录字幕",
+  "Exporting as MP3 re-encodes audio. The source bitrate is used when available; otherwise 192 kb/s is used.": "导出为 MP3 时会重新编码音频；能读取到原音轨码率时会尽量沿用，否则使用 192 kb/s。",
   "Burning subtitles requires re-encoding. The original video bitrate is used when available.": "烧录字幕需要重新编码；如果能读取到原视频码率，就会沿用该码率。",
   "Adding text or subtitles requires re-encoding. The original video bitrate is used when available.": "添加文字或字幕会重新编码；如果能读取到原视频码率，就会沿用该码率。",
   "Choose SRT subtitle file": "选择 SRT 字幕文件",
@@ -1170,3 +1171,4 @@
   "You are in simple mode, meaning some functionality has been simplified or hidden.": "当前处于简化模式，部分功能已简化或隐藏。",
   "You have configured a custom FFmpeg directory. You may change or reset it in Settings.": "已设置自定义 FFmpeg 目录。可在“设置”中更改或重置。"
 }
+

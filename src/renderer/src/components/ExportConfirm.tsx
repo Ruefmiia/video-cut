@@ -401,6 +401,11 @@ function ExportConfirm({
           <tr>
             <td colSpan={3} style={{ color: 'var(--gray-11)', fontSize: '.9em' }}>{t('Burning subtitles requires re-encoding. The original video bitrate is used when available.')}</td>
           </tr>
+          {outFormat === 'mp3' && (
+            <tr>
+              <td colSpan={3} style={{ color: 'var(--gray-11)', fontSize: '.9em' }}>{t('Exporting as MP3 re-encodes audio. The source bitrate is used when available; otherwise 192 kb/s is used.')}</td>
+            </tr>
+          )}
           {outFormat === 'gif' && (
             <tr>
               <td colSpan={3} style={{ color: 'var(--gray-11)', fontSize: '.9em' }}>{t('GIF size estimate for {{duration}} seconds: about {{min}}–{{max}} MB. Actual size varies with motion and colors.', { duration: gifDurationSeconds.toFixed(1), min: (gifRawFrameDataMb * 0.1).toFixed(1), max: gifRawFrameDataMb.toFixed(1) })}</td>
@@ -754,3 +759,4 @@ function ExportConfirm({
 }
 
 export default memo(ExportConfirm);
+

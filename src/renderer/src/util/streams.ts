@@ -169,6 +169,17 @@ function getPerStreamFlags({ stream, outputIndex, outFormat, manuallyCopyDisposi
       // I think DV format only supports PCM_S16LE https://github.com/FFmpeg/FFmpeg/blob/b92028346c35dad837dd1160930435d88bd838b5/libavformat/dvenc.c#L450
       addCodecArgs('pcm_s16le');
       addArgs(`-ar:${outputIndex}`, '48000'); // maybe technically not lossless?
+    } else if (outFormat === 'mp3' && stream.codec_name !== 'mp3') {
+      // MP3 output must contain MP3 audio; transcode other audio codecs instead of stream-copying them.
+      addCodecArgs('libmp3lame');
+      const sourceBitrateKbps = Number(stream.bit_rate) / 1000;
+      const supportedMp3Bitrates = [64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
+      const mp3BitrateKbps = Number.isFinite(sourceBitrateKbps) && sourceBitrateKbps > 0
+        ? supportedMp3Bitrates.reduce((closest, bitrate) => (
+          Math.abs(bitrate - sourceBitrateKbps) < Math.abs(closest - sourceBitrateKbps) ? bitrate : closest
+        ), supportedMp3Bitrates[0]!)
+        : 192;
+      addArgs(`-b:${outputIndex}`, `${mp3BitrateKbps}k`);
     } else if (outFormat === 'flac' && needFlac && stream.codec_name === 'flac') { // https://github.com/mifi/lossless-cut/issues/1809
       addCodecArgs('flac'); // lossless because flac is a lossless codec
     } else {
@@ -448,3 +459,4 @@ export function getVideoTimebase(videoStream: Pick<FFprobeStream, 'time_base'>) 
   }
   return undefined;
 }
+

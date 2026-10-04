@@ -1,5 +1,6 @@
 {
   "Burn in subtitles": "Burn in subtitles",
+  "Exporting as MP3 re-encodes audio. The source bitrate is used when available; otherwise 192 kb/s is used.": "Exporting as MP3 re-encodes audio. The source bitrate is used when available; otherwise 192 kb/s is used.",
   "Burning subtitles requires re-encoding. The original video bitrate is used when available.": "Burning subtitles requires re-encoding. The original video bitrate is used when available.",
   "Adding text or subtitles requires re-encoding. The original video bitrate is used when available.": "Adding text or subtitles requires re-encoding. The original video bitrate is used when available.",
   "Choose SRT subtitle file": "Choose SRT subtitle file",
@@ -933,3 +934,4 @@
   "Zoom in/out timeline": "Zoom in/out timeline",
   "Zoom out timeline": "Zoom out timeline"
 }
+
