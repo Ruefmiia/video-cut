@@ -1,5 +1,9 @@
 [
   {
+    "version": "3.69.1",
+    "highlightsMd": "- Refresh the Chinese start screen with a clearer video import action\n- Refine button spacing, borders, and keyboard focus states\n"
+  },
+  {
     "version": "3.64.0"
   },
   {

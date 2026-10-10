@@ -1,18 +1,14 @@
-import { Fragment, memo, useMemo, useState } from 'react';
-import type { MotionStyle } from 'motion/react';
-import { motion } from 'motion/react';
-import { FaMouse } from 'react-icons/fa';
-import { useTranslation, Trans } from 'react-i18next';
+import { Fragment, memo, useState } from 'react';
+import { FaBaby, FaFilm, FaFolderOpen, FaMouse } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 
-import SetCutpointButton from './components/SetCutpointButton';
-import SimpleModeButton from './components/SimpleModeButton';
 import useUserSettings from './hooks/useUserSettings';
-import type { StateSegment } from './types';
 import type { KeyBinding } from '../../common/types';
 import { splitKeyboardKeys } from './util';
 import { getModifier } from './hooks/useTimelineScroll';
 import Kbd from './components/Kbd';
 import mainApi from './mainApi';
+import styles from './NoFileLoaded.module.css';
 
 
 function Keys({ keys }: { keys: string | undefined }) {
@@ -21,77 +17,79 @@ function Keys({ keys }: { keys: string | undefined }) {
   }
   const split = splitKeyboardKeys(keys);
   return split.map((key, i) => (
-    <Fragment key={key}><Kbd code={key} />{i < split.length - 1 && <span style={{ fontSize: '.7em', marginLeft: '-.2em', marginRight: '-.2em' }}>{' + '}</span>}</Fragment>
+    <Fragment key={key}><Kbd code={key} />{i < split.length - 1 && <span className={styles['keySeparator']}>{' + '}</span>}</Fragment>
   ));
 }
 
-const dropzoneStyle: MotionStyle = {
-  position: 'absolute',
-  left: 0,
-  right: 0,
-  top: 0,
-  bottom: 0,
-  color: 'var(--gray-12)',
-  margin: '2em',
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'center',
-  alignItems: 'center',
-  whiteSpace: 'nowrap',
-  borderWidth: '.7em',
-  borderStyle: 'dashed',
-  borderColor: 'var(--gray-3)',
-};
-
-function NoFileLoaded({ mifiLink, currentCutSeg, onClick, darkMode, keyBindingByAction }: {
+function NoFileLoaded({ mifiLink, onClick, darkMode, keyBindingByAction }: {
   mifiLink: unknown,
-  currentCutSeg: StateSegment | undefined,
   onClick: () => void,
   darkMode?: boolean,
   keyBindingByAction: Record<string, KeyBinding>,
 }) {
   const { t } = useTranslation();
-  const { simpleMode, segmentMouseModifierKey } = useUserSettings();
+  const { simpleMode, segmentMouseModifierKey, toggleSimpleMode } = useUserSettings();
   const [dragging, setDragging] = useState(false);
 
-  const currentCutSegOrDefault = useMemo(() => currentCutSeg ?? { segColorIndex: 0 }, [currentCutSeg]);
-
   return (
-    <motion.div
-      className="no-user-select"
-      style={dropzoneStyle}
-      animate={{ borderColor: dragging ? 'var(--gray-9)' : 'var(--gray-3)' }}
-      onDragOver={() => setDragging(true)}
-      onDragLeave={() => setDragging(false)}
-      role="button"
-      onClick={onClick}
+    <section
+      className={`${styles['emptyState']} no-user-select`}
+      onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+      }}
+      aria-label={t('Get started')}
     >
-      <div style={{ fontSize: '1.7em', textTransform: 'uppercase', color: 'var(--gray-11)', marginBottom: '.1em' }}>{t('DROP FILE(S)')}</div>
+      <div className={`${styles['welcomeCard']} ${dragging ? styles['dragging'] : ''}`}>
+        <div className={styles['brandMark']} aria-hidden="true"><FaFilm /></div>
+        <div className={styles['intro']}>
+          <div className={styles['eyebrow']}>{t('Video Cut')}</div>
+          <h1>{t('A lighter way to cut video')}</h1>
+          <p>{t('Choose moments from a long video, name each clip, and export them separately.')}</p>
+        </div>
 
-      <div style={{ fontSize: '1.3em', color: 'var(--gray-11)', marginBottom: '.1em' }}>
-        <Trans>See <b>Help</b> menu for help</Trans>
+        <button className={styles['openButton']} type="button" onClick={onClick}>
+          <FaFolderOpen aria-hidden="true" />
+          {t('Open file')}
+        </button>
+        <p className={styles['dropHint']}>{t('Or drop a video file here')}</p>
+
+        <div className={styles['workflow']} aria-label={t('Simple editing workflow')}>
+          <div className={styles['workflowStep']}><span>01</span>{t('Choose moments')}</div>
+          <span className={styles['workflowRule']} aria-hidden="true" />
+          <div className={styles['workflowStep']}><span>02</span>{t('Name each clip')}</div>
+          <span className={styles['workflowRule']} aria-hidden="true" />
+          <div className={styles['workflowStep']}><span>03</span>{t('Export separately')}</div>
+        </div>
       </div>
 
-      <div style={{ fontSize: '1.3em', color: 'var(--gray-11)' }}>
-        <Trans><SetCutpointButton currentCutSeg={currentCutSegOrDefault} side="start" style={{ verticalAlign: 'middle' }} /> <SetCutpointButton currentCutSeg={currentCutSegOrDefault} side="end" style={{ verticalAlign: 'middle' }} />, <Keys keys={keyBindingByAction['setCutStart']?.keys} /> <Keys keys={keyBindingByAction['setCutEnd']?.keys} /> or <span><kbd style={{ marginRight: '.1em' }}>{getModifier(segmentMouseModifierKey)}</kbd></span>+<FaMouse style={{ marginRight: '.1em', verticalAlign: 'middle' }} /> to set cutpoints</Trans>
-      </div>
-
-      <div style={{ fontSize: '1.3em', color: 'var(--gray-11)' }} role="button" onClick={(e) => e.stopPropagation()}>
-        {simpleMode ? (
-          <Trans><SimpleModeButton style={{ verticalAlign: 'middle' }} /> to show advanced view</Trans>
-        ) : (
-          <Trans><SimpleModeButton style={{ verticalAlign: 'middle' }} /> to show simple view</Trans>
-        )}
+      <div className={styles['utilityRow']}>
+        <div className={styles['shortcutHint']}>
+          <span>{t('Set cut points')}</span>
+          <span><Keys keys={keyBindingByAction['setCutStart']?.keys} /> <span className={styles['keySeparator']}>/</span> <Keys keys={keyBindingByAction['setCutEnd']?.keys} /></span>
+          <span className={styles['hintDivider']} aria-hidden="true" />
+          <span><kbd>{getModifier(segmentMouseModifierKey)}</kbd> + <FaMouse aria-hidden="true" /></span>
+        </div>
+        <button
+          className={styles['modeButton']}
+          type="button"
+          onClick={toggleSimpleMode}
+          aria-label={simpleMode ? t('Show advanced view') : t('Show simple view')}
+          title={simpleMode ? t('Show advanced view') : t('Show simple view')}
+        >
+          <FaBaby aria-hidden="true" />
+          {simpleMode ? t('Simple view') : t('Advanced view')}
+        </button>
       </div>
 
       {mifiLink && typeof mifiLink === 'object' && 'loadUrl' in mifiLink && typeof mifiLink.loadUrl === 'string' && mifiLink.loadUrl ? (
-        <div style={{ position: 'relative', margin: '.3em', width: '24em', height: '8em' }}>
-          <iframe src={`${mifiLink.loadUrl}#dark=${darkMode ? 'true' : 'false'}`} title="iframe" style={{ background: 'rgba(0,0,0,0)', border: 'none', pointerEvents: 'none', width: '100%', height: '100%', position: 'absolute', colorScheme: 'initial' }} />
+        <div className={styles['communityLink']}>
+          <iframe src={`${mifiLink.loadUrl}#dark=${darkMode ? 'true' : 'false'}`} title="iframe" />
           {/* eslint-disable-next-line jsx-a11y/interactive-supports-focus */}
-          <div style={{ width: '100%', height: '100%', position: 'absolute', cursor: 'pointer' }} title={t('Open link in browser')} role="button" onClick={(e) => { e.stopPropagation(); if ('targetUrl' in mifiLink && typeof mifiLink.targetUrl === 'string') mainApi.openExternal(mifiLink.targetUrl); }} />
+          <div title={t('Open link in browser')} role="button" onClick={() => { if ('targetUrl' in mifiLink && typeof mifiLink.targetUrl === 'string') mainApi.openExternal(mifiLink.targetUrl); }} />
         </div>
       ) : undefined}
-    </motion.div>
+    </section>
   );
 }
 
